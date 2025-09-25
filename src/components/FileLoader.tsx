@@ -1,4 +1,5 @@
 import {type ChangeEvent, useState} from "react";
+import { Rom } from "../hardware/Rom.ts"
 
 export default function FileUploader() {
     const [file, setFile] = useState<File | null>(null)
@@ -16,21 +17,13 @@ export default function FileUploader() {
         const reader = new FileReader();
 
         reader.onload = () => {
-            const typedArray = new Uint8Array(reader.result);
+            const rom = new Rom(reader.result);
             // let i = 0;
             // while (i <= 20){
             //     console.log(i + ": " + typedArray[i].toString(16));
             //     i += 1;
             // }
-            let flag7 = Array.from(typedArray[7].toString(2), Number);
-            if (flag7.length < 8) {
-                const leadingZeroes = new Array(8 - flag7.length)
-                leadingZeroes.fill(0);
-                leadingZeroes.push(flag7);
-                flag7 = leadingZeroes;
-            }
-            console.log("Flag 6: " + typedArray[6].toString(2));
-            console.log("Flag 7: " + flag7);
+            console.log(rom);
 
         }
 
