@@ -1,5 +1,6 @@
 import {type ChangeEvent, useState} from "react";
 import { Rom } from "../hardware/Rom.ts"
+import {Cpu} from "../hardware/Cpu.ts";
 
 export default function FileUploader() {
     const [file, setFile] = useState<File | null>(null)
@@ -25,6 +26,7 @@ export default function FileUploader() {
             // }
             console.log(rom);
 
+            const cpu = new Cpu(rom);
         }
 
         reader.readAsArrayBuffer(file);
