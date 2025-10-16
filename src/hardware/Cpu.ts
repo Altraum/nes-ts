@@ -125,15 +125,15 @@ export class Cpu {
                     this.compare(this.y, address)
                     break;
                 case "DEC":
-                    this.write_address(address, this.read_address(address) - 1)
+                    this.write_address(address, (this.read_address(address) - 1) & 0xFF)
                     this.set_usual_flags(this.read_address(address))
                     break;
                 case "DEX":
-                    this.x -= 1
+                    this.x = (this.x - 1) & 0xFF
                     this.set_usual_flags(this.x)
                     break;
                 case "DEY":
-                    this.y -= 1
+                    this.y = (this.y - 1) & 0xFF
                     this.set_usual_flags(this.y)
                     break;
                 case "EOR":
@@ -142,15 +142,15 @@ export class Cpu {
                     this.evaluate_negative(this.a)
                     break;
                 case "INC":
-                    this.write_address(address, this.read_address(address) + 1)
+                    this.write_address(address, (this.read_address(address) + 1) & 0xFF)
                     this.set_usual_flags(this.read_address(address))
                     break;
                 case "INX":
-                    this.x += 1
+                    this.x = (this.x + 1) & 0xFF
                     this.set_usual_flags(this.x)
                     break;
                 case "INY":
-                    this.y += 1
+                    this.y = (this.y + 1) & 0xFF
                     this.set_usual_flags(this.y)
                     break;
                 case "JMP":
@@ -213,17 +213,21 @@ export class Cpu {
                     break;
                 case "SBC":
                     result = this.a + ~this.read_address(address) + this.registers.C
-                    console.log(this.i + " A + C + memory | " + this.a + " + " + this.registers.C + " + "
+                    console.log(this.i + " SBC | A: " + this.a + " C: " + this.registers.C + " memory: "
                         + this.read_address(address) + " = " + result.toString(16))
                     // console.log("Overflow | a: " + (result ^ this.a) + " + memory: " + (result ^ this.read_address(address))
                     //     + " = " + ((result ^ this.a)
                     //         & (result ^ this.read_address(address)) & 0x80))
                     this.set_usual_flags(result)
+                    console.log("End1 registers: " + this.registers_to_string())
                     console.log("C Register = result: " + result.toString(16) + " > 0xFF")
-                    this.registers.C = Number(~(result > 0xFF))
+                    this.registers.C = Number(result >= 0)
+                    console.log("End2 registers: " + this.registers_to_string())
                     this.registers.V = Number(!!((result ^ this.a)
                         & (result ^ ~this.read_address(address)) & 0x80))
+                    console.log("End3 registers: " + this.registers_to_number().toString(2))
                     this.a = result & 0xFF;
+                    console.log("End4 registers: " + this.registers_to_number().toString(2))
                     break;
                 case "SEC":
                     this.registers.C = 1
@@ -261,7 +265,6 @@ export class Cpu {
                     break;
                 case "TXS":
                     this.s = this.x
-                    this.set_usual_flags(this.s)
                     break;
                 case "TYA":
                     this.a = this.y
@@ -434,6 +437,17 @@ export class Cpu {
             + this.registers.C;
     }
 
+    registers_to_string() : string {
+        return this.registers.N.toString()
+            + this.registers.V.toString()
+            + "1"
+            + this.registers.B.toString()
+            + this.registers.D.toString()
+            + this.registers.I.toString()
+            + this.registers.Z.toString()
+            + this.registers.C.toString()
+    }
+
     number_to_registers(value : number) {
         this.registers.N = Number(this.is_bit_set(value, 7))
         this.registers.V = Number(this.is_bit_set(value, 6))
@@ -491,7 +505,9 @@ export class Cpu {
     }
 
     evaluate_zero(value : number) {
+        console.log("Registers before: " + this.registers_to_number().toString(2))
         this.registers.Z = Number(value % 0x100 == 0);
+        console.log("Registers after: " + this.registers_to_number().toString(2))
     }
 
     is_bit_set(value : number, bitPosition : number) {
