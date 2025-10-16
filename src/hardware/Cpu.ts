@@ -42,21 +42,22 @@ export class Cpu {
                 + " CYC:" + this.cycles
             const token = Opcodes.get(this.read_address(this.pc))
             const address = this.get_address(token!.address_mode)
-            let adc_result : number
+            let result : number
             // @ts-expect-error Undefined case will be handled by Default
             switch (token.instruction){
                 case "ADC":
-                    adc_result = this.a + this.read_address(address) + this.registers.C
-                    // console.log("A + C + memory | " + this.a + " + " + this.registers.C + " + "
-                    //     + this.read_address(address) + " = " + adc_result.toString(16))
-                    console.log("Overflow | a: " + (adc_result ^ this.a) + " + memory: " + (adc_result ^ this.read_address(address))
-                        + " = " + ((adc_result ^ this.a)
-                            & (adc_result ^ this.read_address(address)) & 0x80))
-                    this.set_usual_flags(adc_result)
-                    this.registers.C = Number(adc_result > 0xFF)
-                    this.registers.V = Number(!!((adc_result ^ this.a)
-                        & (adc_result ^ this.read_address(address)) & 0x80))
-                    this.a = adc_result
+                    result = this.a + this.read_address(address) + this.registers.C
+                    console.log(this.i + " A + C + memory | " + this.a + " + " + this.registers.C + " + "
+                        + this.read_address(address) + " = " + result.toString(16))
+                    // console.log("Overflow | a: " + (result ^ this.a) + " + memory: " + (result ^ this.read_address(address))
+                    //     + " = " + ((result ^ this.a)
+                    //         & (result ^ this.read_address(address)) & 0x80))
+                    this.set_usual_flags(result)
+                    console.log("C Register = result: " + result.toString(16) + " > 0xFF")
+                    this.registers.C = Number(result > 0xFF)
+                    this.registers.V = Number(!!((result ^ this.a)
+                        & (result ^ this.read_address(address)) & 0x80))
+                    this.a = result & 0xFF;
                     break;
                 case "AND":
                     this.a &= this.read_address(address)
@@ -124,13 +125,16 @@ export class Cpu {
                     this.compare(this.y, address)
                     break;
                 case "DEC":
-                    this.get_address(token!.address_mode)
+                    this.write_address(address, this.read_address(address) - 1)
+                    this.set_usual_flags(this.read_address(address))
                     break;
                 case "DEX":
-                    this.get_address(token!.address_mode)
+                    this.x -= 1
+                    this.set_usual_flags(this.x)
                     break;
                 case "DEY":
-                    this.get_address(token!.address_mode)
+                    this.y -= 1
+                    this.set_usual_flags(this.y)
                     break;
                 case "EOR":
                     this.a ^= this.read_address(address)
@@ -138,13 +142,16 @@ export class Cpu {
                     this.evaluate_negative(this.a)
                     break;
                 case "INC":
-                    this.get_address(token!.address_mode)
+                    this.write_address(address, this.read_address(address) + 1)
+                    this.set_usual_flags(this.read_address(address))
                     break;
                 case "INX":
-                    this.get_address(token!.address_mode)
+                    this.x += 1
+                    this.set_usual_flags(this.x)
                     break;
                 case "INY":
-                    this.get_address(token!.address_mode)
+                    this.y += 1
+                    this.set_usual_flags(this.y)
                     break;
                 case "JMP":
                     this.pc = address - 1
@@ -205,7 +212,18 @@ export class Cpu {
                     this.pc = this.pull_from_stack()
                     break;
                 case "SBC":
-                    this.get_address(token!.address_mode)
+                    result = this.a + ~this.read_address(address) + this.registers.C
+                    console.log(this.i + " A + C + memory | " + this.a + " + " + this.registers.C + " + "
+                        + this.read_address(address) + " = " + result.toString(16))
+                    // console.log("Overflow | a: " + (result ^ this.a) + " + memory: " + (result ^ this.read_address(address))
+                    //     + " = " + ((result ^ this.a)
+                    //         & (result ^ this.read_address(address)) & 0x80))
+                    this.set_usual_flags(result)
+                    console.log("C Register = result: " + result.toString(16) + " > 0xFF")
+                    this.registers.C = Number(~(result > 0xFF))
+                    this.registers.V = Number(!!((result ^ this.a)
+                        & (result ^ ~this.read_address(address)) & 0x80))
+                    this.a = result & 0xFF;
                     break;
                 case "SEC":
                     this.registers.C = 1
@@ -226,22 +244,28 @@ export class Cpu {
                     this.write_address(address, this.y)
                     break;
                 case "TAX":
-                    this.get_address(token!.address_mode)
+                    this.x = this.a
+                    this.set_usual_flags(this.x)
                     break;
                 case "TAY":
-                    this.get_address(token!.address_mode)
+                    this.y = this.a
+                    this.set_usual_flags(this.y)
                     break;
                 case "TSX":
-                    this.get_address(token!.address_mode)
+                    this.x = this.s
+                    this.set_usual_flags(this.x)
                     break;
                 case "TXA":
-                    this.get_address(token!.address_mode)
+                    this.a = this.x
+                    this.set_usual_flags(this.a)
                     break;
                 case "TXS":
-                    this.get_address(token!.address_mode)
+                    this.s = this.x
+                    this.set_usual_flags(this.s)
                     break;
                 case "TYA":
-                    this.get_address(token!.address_mode)
+                    this.a = this.y
+                    this.set_usual_flags(this.a)
                     break;
                 default:
                     console.log("Token not found: " + token!.instruction)
@@ -467,7 +491,7 @@ export class Cpu {
     }
 
     evaluate_zero(value : number) {
-        this.registers.Z = Number(value == 0);
+        this.registers.Z = Number(value % 0x100 == 0);
     }
 
     is_bit_set(value : number, bitPosition : number) {
