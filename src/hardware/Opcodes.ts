@@ -1,6 +1,6 @@
 import { address_modes } from "./AddressModes.ts";
 
-export const Opcodes = new Map ([
+export const Opcodes = new Map <number, Opcode | undefined> ([
     //0x0x
     [0x00, {instruction : "BRK", address_mode : address_modes.imm, cycles : 7, crosses_page : false}],
     [0x01, {instruction : "ORA", address_mode : address_modes.izx, cycles : 6, crosses_page : false}],
@@ -274,3 +274,10 @@ export const Opcodes = new Map ([
     [0xFE, {instruction : "INC", address_mode : address_modes.abx, cycles : 7, crosses_page : false}],
     [0xFF, {instruction : "ISC", address_mode : address_modes.abx, cycles : 7, crosses_page : false}]
 ])
+
+export type Opcode = {
+    instruction : string,
+    address_mode : string,
+    cycles : number,
+    crosses_page : boolean
+}

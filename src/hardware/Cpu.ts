@@ -1,30 +1,21 @@
 import { Rom } from "./Rom.ts"
-import { Opcodes } from "./Opcodes.ts";
-
-const address_mode = {
-    acc: "ACCUMULATOR",
-    abs: "ABSOLUTE",
-    absx: "ABSOLUTE X",
-    absy: "ABSOLUTE Y",
-    imd: "IMMEDIATE",
-    imp: "IMPLIED",
-    ind: "INDIRECT",
-    indx: "INDIRECT X",
-    indy: "INDIRECT Y",
-    rel: "RELATIVE",
-    zro: "ZERO PAGE",
-    zrox: "ZERO PAGE X",
-    zroy: "ZERO PAGE Y"
-}
+import { Opcodes, type Opcode } from "./Opcodes.ts";
+import { address_modes } from "./AddressModes.ts";
 
 export class Cpu {
+    i : number = 1;
     rom : Rom;
     a : number = 0;
     x: number = 0;
     y: number = 0;
     pc: number = 65532;
-    s: number = 0;
+    s: number = 0xFD;
     p: boolean = false;
+    cycles: number = 7;
+    log: Array<string> = [];
+    logline: string = "";
+    stack : Array<number> = [0xFD]
+    ram: Array<number> = new Array<number>(0x800).fill(0);
 
     registers = {
         C: 0,
@@ -32,449 +23,460 @@ export class Cpu {
         I: 1,
         D: 0,
         V: 0,
-        N: 0
+        N: 0,
+        B: 0
     }
 
     constructor(rom_data : Rom) {
         this.rom = rom_data;
         let parsing : boolean = true;
-        const logging : boolean = true;
         this.pc = this.get_init()
         while (parsing) {
+            this.logline += this.i + " " + this.pc.toString(16)
+            const register_status = "A:" + this.a.toString(16)
+                + " X:" + this.x.toString(16)
+                + " Y:" + this.y.toString(16)
+                + " P:" + this.registers_to_number().toString(16)
+                + " SP:" + this.s.toString(16)
+                + " PPU:" + "0".padStart(3, " ") + "," + "0".padStart(3," ")
+                + " CYC:" + this.cycles
             const token = Opcodes.get(this.read_address(this.pc))
-            switch (token?.instruction){
+            const address = this.get_address(token!.address_mode)
+            let adc_result : number
+            // @ts-expect-error Undefined case will be handled by Default
+            switch (token.instruction){
                 case "ADC":
-                    if(logging){
-                        console.log("ADC")
-                    }
-                    this.find_address(token?.address_mode)
+                    adc_result = this.a + this.read_address(address) + this.registers.C
+                    // console.log("A + C + memory | " + this.a + " + " + this.registers.C + " + "
+                    //     + this.read_address(address) + " = " + adc_result.toString(16))
+                    console.log("Overflow | a: " + (adc_result ^ this.a) + " + memory: " + (adc_result ^ this.read_address(address))
+                        + " = " + ((adc_result ^ this.a)
+                            & (adc_result ^ this.read_address(address)) & 0x80))
+                    this.set_usual_flags(adc_result)
+                    this.registers.C = Number(adc_result > 0xFF)
+                    this.registers.V = Number(!!((adc_result ^ this.a)
+                        & (adc_result ^ this.read_address(address)) & 0x80))
+                    this.a = adc_result
                     break;
                 case "AND":
-                    if(logging){
-                        console.log("AND")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.a &= this.read_address(address)
+                    this.evaluate_zero(this.a)
+                    this.evaluate_negative(this.a)
                     break;
                 case "ASL":
-                    if(logging){
-                        console.log("ASL")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.get_address(token!.address_mode)
                     break;
                 case "BCC":
-                    if(logging){
-                        console.log("BCC")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.branch(!this.registers.C, address)
                     break;
                 case "BCS":
-                    if(logging){
-                        console.log("BCS")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.branch(this.registers.C, address)
                     break;
                 case "BEQ":
-                    if(logging){
-                        console.log("BEQ")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.branch(this.registers.Z, address)
                     break;
                 case "BIT":
-                    if(logging){
-                        console.log("BIT")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.evaluate_zero(this.a & this.read_address(address))
+                    this.evaluate_negative(this.read_address(address))
+                    this.evaluate_overflow(this.read_address(address))
                     break;
                 case "BMI":
-                    if(logging){
-                        console.log("BMI")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.branch(this.registers.N, address)
                     break;
                 case "BNE":
-                    if(logging){
-                        console.log("BNE")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.branch(!this.registers.Z, address)
                     break;
                 case "BPL":
-                    if(logging){
-                        console.log("BPL")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.branch(!this.registers.N, address)
                     break;
                 case "BRK":
-                    if(logging){
-                        console.log("BRK")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.pc += 1;
+                    // while(Opcodes.get(this.read_address(this.pc))?.instruction == "BRK"){
+                    //     this.pc += 1 ;
+                    // }
+                    parsing = false;
                     break;
                 case "BVC":
-                    if(logging){
-                        console.log("BVC")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.branch(!this.registers.V, address)
                     break;
                 case "BVS":
-                    if(logging){
-                        console.log("BVS")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.branch(this.registers.V, address)
                     break;
                 case "CLC":
-                    if(logging){
-                        console.log("CLC")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.registers.C = 0
                     break;
                 case "CLD":
-                    if(logging){
-                        console.log("CLD")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.registers.D = 0
                     break;
                 case "CLI":
-                    if(logging){
-                        console.log("CLI")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.registers.I = 0
                     break;
                 case "CLV":
-                    if(logging){
-                        console.log("CLV")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.registers.V = 0
                     break;
                 case "CMP":
-                    if(logging){
-                        console.log("CMP")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.compare(this.a, address)
                     break;
                 case "CPX":
-                    if(logging){
-                        console.log("CPX")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.compare(this.x, address)
                     break;
                 case "CPY":
-                    if(logging){
-                        console.log("CPY")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.compare(this.y, address)
                     break;
                 case "DEC":
-                    if(logging){
-                        console.log("DEC")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.get_address(token!.address_mode)
                     break;
                 case "DEX":
-                    if(logging){
-                        console.log("DEX")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.get_address(token!.address_mode)
                     break;
                 case "DEY":
-                    if(logging){
-                        console.log("DEY")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.get_address(token!.address_mode)
                     break;
                 case "EOR":
-                    if(logging){
-                        console.log("EOR")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.a ^= this.read_address(address)
+                    this.evaluate_zero(this.a)
+                    this.evaluate_negative(this.a)
                     break;
                 case "INC":
-                    if(logging){
-                        console.log("INC")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.get_address(token!.address_mode)
                     break;
                 case "INX":
-                    if(logging){
-                        console.log("INX")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.get_address(token!.address_mode)
                     break;
                 case "INY":
-                    if(logging){
-                        console.log("INY")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.get_address(token!.address_mode)
                     break;
                 case "JMP":
-                    if(logging){
-                        console.log("JMP")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.pc = address - 1
                     break;
                 case "JSR":
-                    if(logging){
-                        console.log("JSR")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.push_to_stack(this.pc)
+                    this.pc = address - 1
                     break;
                 case "LDA":
-                    if(logging){
-                        console.log("LDA")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.a = this.read_address(address)
+                    this.set_usual_flags(this.a)
                     break;
                 case "LDX":
-                    if(logging){
-                        console.log("LDX")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.x = this.read_address(address)
+                    this.set_usual_flags(this.x)
                     break;
                 case "LDY":
-                    if(logging){
-                        console.log("LDY")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.y = this.read_address(address)
+                    this.set_usual_flags(this.y)
                     break;
                 case "LSR":
-                    if(logging){
-                        console.log("LSR")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.get_address(token!.address_mode)
                     break;
                 case "NOP":
-                    if(logging){
-                        console.log("NOP")
-                    }
-                    this.find_address(token?.address_mode)
                     break;
                 case "ORA":
-                    if(logging){
-                        console.log("ORA")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.a |= this.read_address(address)
+                    this.evaluate_zero(this.a)
+                    this.evaluate_negative(this.a)
                     break;
                 case "PHA":
-                    if(logging){
-                        console.log("PHA")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.push_to_stack(this.a)
                     break;
                 case "PHP":
-                    if(logging){
-                        console.log("PHP")
+                    if (this.registers.B) {
+                        this.push_to_stack(this.registers_to_number())
+                    } else {
+                        this.push_to_stack(this.registers_to_number() + 0b10000)
                     }
-                    this.find_address(token?.address_mode)
                     break;
                 case "PLA":
-                    if(logging){
-                        console.log("PLA")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.a = this.pull_from_stack()
+                    this.set_usual_flags(this.a)
                     break;
                 case "PLP":
-                    if(logging){
-                        console.log("PLP")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.number_to_registers(this.pull_from_stack())
                     break;
                 case "ROL":
-                    if(logging){
-                        console.log("ROL")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.get_address(token!.address_mode)
                     break;
                 case "ROR":
-                    if(logging){
-                        console.log("ROR")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.get_address(token!.address_mode)
                     break;
                 case "RTI":
-                    if(logging){
-                        console.log("RTI")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.get_address(token!.address_mode)
                     break;
                 case "RTS":
-                    if(logging){
-                        console.log("RTS")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.pc = this.pull_from_stack()
                     break;
                 case "SBC":
-                    if(logging){
-                        console.log("SBC")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.get_address(token!.address_mode)
                     break;
                 case "SEC":
-                    if(logging){
-                        console.log("SEC")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.registers.C = 1
                     break;
                 case "SED":
-                    if(logging){
-                        console.log("SED")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.registers.D = 1
                     break;
                 case "SEI":
-                    if(logging){
-                        console.log("SEI")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.registers.I = 1
                     break;
                 case "STA":
-                    if(logging){
-                        console.log("STA")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.write_address(address, this.a)
                     break;
                 case "STX":
-                    if(logging){
-                        console.log("STX")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.write_address(address, this.x)
                     break;
                 case "STY":
-                    if(logging){
-                        console.log("STY")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.write_address(address, this.y)
                     break;
                 case "TAX":
-                    if(logging){
-                        console.log("TAX")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.get_address(token!.address_mode)
                     break;
                 case "TAY":
-                    if(logging){
-                        console.log("TAY")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.get_address(token!.address_mode)
                     break;
                 case "TSX":
-                    if(logging){
-                        console.log("TSX")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.get_address(token!.address_mode)
                     break;
                 case "TXA":
-                    if(logging){
-                        console.log("TXA")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.get_address(token!.address_mode)
                     break;
                 case "TXS":
-                    if(logging){
-                        console.log("TXS")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.get_address(token!.address_mode)
                     break;
                 case "TYA":
-                    if(logging){
-                        console.log("TYA")
-                    }
-                    this.find_address(token?.address_mode)
+                    this.get_address(token!.address_mode)
                     break;
                 default:
-                    console.log("Token not found: " + token?.instruction)
+                    console.log("Token not found: " + token!.instruction)
                     parsing = false;
             }
+            this.cycles += token!.cycles;
+            this.logline += register_status
+            this.log.push(this.logline.toUpperCase())
+            // console.log((this.i + " " + this.logline).toUpperCase())
+            this.logline = ""
             this.pc += 1;
+            this.i += 1
+        }
+        console.log(this.log.join('\n'))
+    }
+
+    get_log() {
+        return this.log.join('\n')
+    }
+
+    get_address(mode : string) : number {
+        let upper_nibble : number
+        let lower_nibble : number
+        let offset : number
+        switch (mode) {
+            //DONE
+            case address_modes.acc:
+                this.append_instruction_log(this.read_address(this.pc))
+                return this.a
+            //DONE?
+            case address_modes.abs:
+                this.append_instruction_log(this.read_address(this.pc),
+                    this.read_address(this.pc + 1), this.read_address(this.pc + 2))
+                this.pc += 2;
+                upper_nibble = this.read_address(this.pc)
+                lower_nibble = this.read_address(this.pc - 1)
+                return this.combine_nibbles(upper_nibble, lower_nibble)
+            //DONE?
+            case address_modes.abx:
+                this.append_instruction_log(this.read_address(this.pc),
+                    this.read_address(this.pc + 1), this.read_address(this.pc + 2))
+                this.pc += 2;
+                upper_nibble = this.read_address(this.pc)
+                lower_nibble = this.read_address(this.pc - 1)
+                return this.combine_nibbles(upper_nibble, lower_nibble) + this.x
+            //DONE?
+            case address_modes.aby:
+                this.append_instruction_log(this.read_address(this.pc),
+                    this.read_address(this.pc + 1), this.read_address(this.pc + 2))
+                this.pc += 2;
+                upper_nibble = this.read_address(this.pc)
+                lower_nibble = this.read_address(this.pc - 1)
+                return this.combine_nibbles(upper_nibble, lower_nibble) + this.y
+            //DONE
+            case address_modes.imm:
+                this.append_instruction_log(this.read_address(this.pc), this.read_address(this.pc + 1))
+                this.pc += 1;
+                return this.pc
+            //DONE
+            case address_modes.imp:
+                this.append_instruction_log(this.read_address(this.pc))
+                return NaN
+            //WIP
+            case address_modes.ind:
+                this.append_instruction_log(this.read_address(this.pc),
+                    this.read_address(this.pc + 1), this.read_address(this.pc + 2))
+                this.pc += 2;
+                return NaN
+                // return this.read_address(this.combine_nibbles(
+                //     this.read_address(this.read_address(this.pc)),
+                //     this.read_address(this.read_address(this.pc - 1))
+                // ))
+            //WIP
+            case address_modes.izx:
+                this.append_instruction_log(this.read_address(this.pc),
+                    this.read_address(this.pc + 1), this.read_address(this.pc + 2))
+                this.pc += 1;
+                upper_nibble = this.read_address(this.pc)
+                lower_nibble = this.read_address(this.pc - 1)
+                return NaN
+                // return this.read_address(this.combine_nibbles(
+                //     this.read_address(upper_nibble),
+                //     this.read_address(lower_nibble)
+                // ))
+            //WIP
+            case address_modes.izy:
+                this.append_instruction_log(this.read_address(this.pc),
+                    this.read_address(this.pc + 1), this.read_address(this.pc + 2))
+                this.pc += 1;
+                return NaN
+                // return this.read_address(this.pc)
+            //DONE
+            case address_modes.rel:
+                this.append_instruction_log(this.read_address(this.pc), this.read_address(this.pc + 1))
+                this.pc += 1;
+                offset = this.read_address(this.pc)
+                if (offset & 0x80) offset = offset - 0x100;
+                return this.pc + offset
+            //DONE?
+            case address_modes.zpo:
+                this.append_instruction_log(this.read_address(this.pc), this.read_address(this.pc + 1))
+                this.pc += 1;
+                return this.read_address(this.pc)
+            //DONE?
+            case address_modes.zpx:
+                this.append_instruction_log(this.read_address(this.pc), this.read_address(this.pc + 1))
+                this.pc += 1;
+                return this.read_address(this.pc) + this.x
+            //DONE?
+            case address_modes.zpy:
+                this.append_instruction_log(this.read_address(this.pc), this.read_address(this.pc + 1))
+                this.pc += 1;
+                return this.read_address(this.pc) + this.y
+            default:
+                console.log("Unrecognized address mode: " + mode)
+                return NaN
         }
     }
 
-    find_address(mode : string) : number | void {
-        switch (mode) {
-            case address_mode.acc:
-                console.log(address_mode.acc);
-                break;
-            case address_mode.abs:
-                this.pc += 2;
-                console.log(address_mode.abs + " | " + this.read_address(this.pc - 1).toString(16)
-                    + this.read_address(this.pc).toString(16));
-                return this.read_address(this.combine_nibbles(
-                    this.read_address(this.pc - 1),
-                    this.read_address(this.pc)
-                ))
-            case address_mode.absx:
-                this.pc += 2;
-                console.log(address_mode.absx + " | " + this.read_address(this.pc - 1).toString(16)
-                    + this.read_address(this.pc).toString(16));
-                return this.read_address(this.combine_nibbles(
-                    this.read_address(this.pc - 1),
-                    this.read_address(this.pc)
-                ))
-            case address_mode.absy:
-                this.pc += 2;
-                console.log(address_mode.absy + " | " + this.read_address(this.pc - 1).toString(16)
-                    + this.read_address(this.pc).toString(16));
-                return this.read_address(this.combine_nibbles(
-                    this.read_address(this.pc - 1),
-                    this.read_address(this.pc)
-                ))
-            case address_mode.imd:
-                this.pc += 1;
-                console.log(address_mode.imd + " | " + this.read_address(this.pc).toString(16));
-                return this.read_address(this.pc)
-            case address_mode.imp:
-                console.log(address_mode.imp);
-                break;
-            case address_mode.ind:
-                this.pc += 2;
-                console.log(address_mode.ind + " | " + this.read_address(this.pc - 1).toString(16)
-                    + this.read_address(this.pc).toString(16));
-                return this.read_address(this.combine_nibbles(
-                    this.read_address(this.pc - 1),
-                    this.read_address(this.pc)
-                ))
-            case address_mode.indx:
-                this.pc += 1;
-                console.log(address_mode.indx + " | " + this.read_address(this.pc).toString(16));
-                return this.read_address(this.pc)
-            case address_mode.indy:
-                this.pc += 1;
-                console.log(address_mode.indy + " | " + this.read_address(this.pc).toString(16));
-                return this.read_address(this.pc)
-            case address_mode.rel:
-                this.pc += 1;
-                console.log(address_mode.rel + " | " + this.read_address(this.pc).toString(16));
-                return this.read_address(this.pc)
-            case address_mode.zro:
-                this.pc += 1;
-                console.log(address_mode.zro + " | " + this.read_address(this.pc).toString(16));
-                return this.read_address(this.pc)
-            case address_mode.zrox:
-                this.pc += 1;
-                console.log(address_mode.zrox + " | " + this.read_address(this.pc).toString(16));
-                return this.read_address(this.pc)
-            case address_mode.zroy:
-                this.pc += 1;
-                console.log(address_mode.zroy + " | " + this.read_address(this.pc).toString(16));
-                return this.read_address(this.pc)
-            default:
-                console.error("Unrecognized address mode " + mode);
-        }
+    write_address(address : number, value : number) {
+        this.ram[address % 0x800] = value
     }
 
     read_address(address : number) : number {
-        console.log("Reading address " + address.toString(16) + " -> " + (address - 0x8000).toString(16)
-            + " | " + this.rom.prg_data[address - 0x8000].toString(16));
-        return this.rom.prg_data[address - 0x8000];
+        if (address < 0x2000) return this.ram[address % 0x800];
+        if (address < 0x4000) {
+            console.log("Attempt at PPU Register Read")
+            return 0 % 8;
+        }
+        if (address < 0x6000) {
+            console.log("Attempt at unused memory read")
+            return 0
+        }
+        if (address < 0x8000) {
+            console.log("Attempt at PRG RAM Read")
+            return 0;
+        }
+        if (address >= 0x8000) {
+            if (this.rom.prg_units == 1) {
+                return this.rom.prg_data[address % 0x4000]
+            } else {
+                return this.rom.prg_data[address % 0x8000]
+            }
+        }
+        return 0;
     }
 
     get_init() : number {
-        const init_upper = this.rom.prg_data[this.rom.prg_data.length - 4] * 256
-        const init_lower = this.rom.prg_data[this.rom.prg_data.length - 3]
-        return init_upper + init_lower;
-        //this.read_address(this.pc)
-        // this.read_address(reset_vector).toString(16)
+        const init_upper = this.rom.prg_data[this.rom.prg_data.length - 3]
+        const init_lower = this.rom.prg_data[this.rom.prg_data.length - 4]
+        return this.combine_nibbles(init_upper, init_lower);
     }
 
     combine_nibbles(upper_nibble : number, lower_nibble : number) : number {
         return (upper_nibble * 256) + lower_nibble;
+    }
+
+    registers_to_number() : number {
+        return this.registers.N * 0b10000000
+            + this.registers.V * 0b1000000
+            + 0b100000
+            + this.registers.B * 0b10000
+            + this.registers.D * 0b1000
+            + this.registers.I * 0b100
+            + this.registers.Z * 0b10
+            + this.registers.C;
+    }
+
+    number_to_registers(value : number) {
+        this.registers.N = Number(this.is_bit_set(value, 7))
+        this.registers.V = Number(this.is_bit_set(value, 6))
+        this.registers.D = Number(this.is_bit_set(value, 3))
+        this.registers.I = Number(this.is_bit_set(value, 2))
+        this.registers.Z = Number(this.is_bit_set(value, 1))
+        this.registers.C = Number(this.is_bit_set(value, 0))
+    }
+    process_token(token : Opcode) {
+        console.log(token);
+    }
+
+    append_instruction_log(instruction : number, address1? : number, address2? : number) {
+        if (arguments.length == 1){
+            this.logline += "  " + instruction.toString(16).padStart(2,"0").padEnd(10, " ")
+        } else if (arguments.length == 2){
+            this.logline += "  " + (instruction.toString(16).padStart(2,"0") + " " +
+                address1!.toString(16).padStart(2,"0")).padEnd(10, " ")
+        } else if (arguments.length == 3){
+            this.logline += "  " + (instruction.toString(16).padStart(2,"0") + " " +
+                address1!.toString(16).padStart(2,"0")  + " " +
+                address2!.toString(16).padStart(2,"0")).padEnd(10, " ")
+        }
+        this.logline += Opcodes.get(instruction)?.instruction + " "
+    }
+
+    set_usual_flags(value:number) {
+        this.evaluate_zero(value)
+        this.evaluate_negative(value);
+    }
+
+    branch(register:number|boolean, address : number) {
+        if (register) {
+            this.pc = address
+        }
+    }
+
+    push_to_stack(value:number) {
+        this.stack.push(value)
+        this.s -= value < 256 ? 1 : 2
+    }
+
+    pull_from_stack() : number {
+        const value = this.stack.pop()
+        this.s += value! < 256 ? 1 : 2
+        return value!
+    }
+
+    evaluate_negative(value : number) {
+        this.registers.N = this.is_bit_set(value, 7) ? 1 : 0;
+    }
+
+    evaluate_overflow(value : number) {
+        this.registers.V = this.is_bit_set(value, 6) ? 1 : 0;
+    }
+
+    evaluate_zero(value : number) {
+        this.registers.Z = Number(value == 0);
+    }
+
+    is_bit_set(value : number, bitPosition : number) {
+        return (value & (1 << bitPosition)) !== 0;
+    }
+
+    compare(value : number, address : number){
+        this.registers.C = Number(value >= this.read_address(address))
+        this.registers.Z = Number(value == this.read_address(address))
+        this.evaluate_negative(value - this.read_address(address))
     }
 }

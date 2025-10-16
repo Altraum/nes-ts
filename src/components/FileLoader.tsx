@@ -1,6 +1,10 @@
 import {type ChangeEvent, useState} from "react";
 import { Rom } from "../hardware/Rom.ts"
 import {Cpu} from "../hardware/Cpu.ts";
+import CopyToClipboardButton from "./CopyToClipboardButton.tsx";
+
+let cpu : Cpu
+let log : string
 
 export default function FileUploader() {
     const [file, setFile] = useState<File | null>(null)
@@ -26,7 +30,8 @@ export default function FileUploader() {
             // }
             console.log(rom);
 
-            const cpu = new Cpu(rom);
+            cpu = new Cpu(rom);
+            log = cpu.get_log()
         }
 
         reader.readAsArrayBuffer(file);
@@ -35,6 +40,7 @@ export default function FileUploader() {
     return (
         <div>
             <input type="file" onChange={handleFileChange}/>
+            <CopyToClipboardButton log = {log}/>
         </div>
     )
 }
