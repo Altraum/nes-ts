@@ -1,9 +1,10 @@
 import { Rom } from "./Rom.ts"
 import { Opcodes, type Opcode } from "./Opcodes.ts";
 import { address_modes } from "./AddressModes.ts";
+import {goldtest} from "../goldtest.ts";
 
 export class Cpu {
-    i : number = 1;
+    i : number = 0;
     rom : Rom;
     a : number = 0;
     x: number = 0;
@@ -14,8 +15,9 @@ export class Cpu {
     cycles: number = 7;
     log: Array<string> = [];
     logline: string = "";
-    stack : Array<number> = [0xFD]
+    stack : Array<number> = [];
     ram: Array<number> = new Array<number>(0x800).fill(0);
+    comparing : boolean = true;
 
     registers = {
         C: 0,
@@ -32,12 +34,12 @@ export class Cpu {
         let parsing : boolean = true;
         this.pc = this.get_init()
         while (parsing) {
-            this.logline += this.i + " " + this.pc.toString(16)
-            const register_status = "A:" + this.a.toString(16)
-                + " X:" + this.x.toString(16)
-                + " Y:" + this.y.toString(16)
-                + " P:" + this.registers_to_number().toString(16)
-                + " SP:" + this.s.toString(16)
+            this.logline += this.pc.toString(16)
+            const register_status = "A:" + this.a.toString(16).padStart(2,"0")
+                + " X:" + this.x.toString(16).padStart(2,"0")
+                + " Y:" + this.y.toString(16).padStart(2,"0")
+                + " P:" + this.registers_to_number().toString(16).padStart(2,"0")
+                + " SP:" + this.s.toString(16).padStart(2,"0")
                 + " PPU:" + "0".padStart(3, " ") + "," + "0".padStart(3," ")
                 + " CYC:" + this.cycles
             const token = Opcodes.get(this.read_address(this.pc))
@@ -47,13 +49,10 @@ export class Cpu {
             switch (token.instruction){
                 case "ADC":
                     result = this.a + this.read_address(address) + this.registers.C
-                    console.log(this.i + " A + C + memory | " + this.a + " + " + this.registers.C + " + "
-                        + this.read_address(address) + " = " + result.toString(16))
                     // console.log("Overflow | a: " + (result ^ this.a) + " + memory: " + (result ^ this.read_address(address))
                     //     + " = " + ((result ^ this.a)
                     //         & (result ^ this.read_address(address)) & 0x80))
                     this.set_usual_flags(result)
-                    console.log("C Register = result: " + result.toString(16) + " > 0xFF")
                     this.registers.C = Number(result > 0xFF)
                     this.registers.V = Number(!!((result ^ this.a)
                         & (result ^ this.read_address(address)) & 0x80))
@@ -213,21 +212,14 @@ export class Cpu {
                     break;
                 case "SBC":
                     result = this.a + ~this.read_address(address) + this.registers.C
-                    console.log(this.i + " SBC | A: " + this.a + " C: " + this.registers.C + " memory: "
-                        + this.read_address(address) + " = " + result.toString(16))
                     // console.log("Overflow | a: " + (result ^ this.a) + " + memory: " + (result ^ this.read_address(address))
                     //     + " = " + ((result ^ this.a)
                     //         & (result ^ this.read_address(address)) & 0x80))
                     this.set_usual_flags(result)
-                    console.log("End1 registers: " + this.registers_to_string())
-                    console.log("C Register = result: " + result.toString(16) + " > 0xFF")
                     this.registers.C = Number(result >= 0)
-                    console.log("End2 registers: " + this.registers_to_string())
                     this.registers.V = Number(!!((result ^ this.a)
                         & (result ^ ~this.read_address(address)) & 0x80))
-                    console.log("End3 registers: " + this.registers_to_number().toString(2))
                     this.a = result & 0xFF;
-                    console.log("End4 registers: " + this.registers_to_number().toString(2))
                     break;
                 case "SEC":
                     this.registers.C = 1
@@ -276,8 +268,10 @@ export class Cpu {
             }
             this.cycles += token!.cycles;
             this.logline += register_status
-            this.log.push(this.logline.toUpperCase())
+            this.logline = this.logline.toUpperCase()
+            this.log.push(this.logline)
             // console.log((this.i + " " + this.logline).toUpperCase())
+            if(this.comparing) this.compare_logs()
             this.logline = ""
             this.pc += 1;
             this.i += 1
@@ -393,6 +387,8 @@ export class Cpu {
     }
 
     read_address(address : number) : number {
+        // if (address < 0x0100) return this.ram[address % 0x800];
+        // if (address < 0x0200) return this.stack[0x200 - address]
         if (address < 0x2000) return this.ram[address % 0x800];
         if (address < 0x4000) {
             console.log("Attempt at PPU Register Read")
@@ -505,9 +501,7 @@ export class Cpu {
     }
 
     evaluate_zero(value : number) {
-        console.log("Registers before: " + this.registers_to_number().toString(2))
         this.registers.Z = Number(value % 0x100 == 0);
-        console.log("Registers after: " + this.registers_to_number().toString(2))
     }
 
     is_bit_set(value : number, bitPosition : number) {
@@ -518,5 +512,19 @@ export class Cpu {
         this.registers.C = Number(value >= this.read_address(address))
         this.registers.Z = Number(value == this.read_address(address))
         this.evaluate_negative(value - this.read_address(address))
+    }
+
+    compare_logs() {
+        const my_log : string = this.logline.slice(0,20) + " " + this.logline.slice(20,46)
+        const gold_log : string = goldtest[this.i].slice(0,20) + " " + goldtest[this.i].slice(48,74)
+        if (!(my_log === gold_log)) {
+            console.log("A bug at line " + (this.i-1))
+            console.log("GOLD| " + goldtest[this.i-1].slice(0,20) + " " + goldtest[this.i-1].slice(48,74))
+            // console.log("MINE| " + this.log[this.i-1].slice(0,20) + " " + this.log[this.i-1].slice(20,46))
+            console.log("Caused a diff at line " + this.i)
+            console.log("GOLD| " + gold_log)
+            console.log("MINE| " + my_log)
+            this.comparing = false
+        }
     }
 }
