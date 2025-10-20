@@ -63,7 +63,16 @@ export class Cpu {
                     this.evaluate_negative(this.a)
                     break;
                 case "ASL":
-                    this.get_address(token!.address_mode)
+                    if (token?.address_mode == address_modes.acc) {
+                        result = address
+                    } else{
+                        result = this.read_address(address)
+                    }
+                    this.registers.C = Number(this.is_bit_set(result, 7))
+                    result = (result << 1) & 0xFF
+                    this.registers.N = Number(this.is_bit_set(result, 7))
+                    this.evaluate_zero(result)
+                    this.write_address(address, result, true)
                     break;
                 case "BCC":
                     this.branch(!this.registers.C, address)
@@ -171,7 +180,16 @@ export class Cpu {
                     this.set_usual_flags(this.y)
                     break;
                 case "LSR":
-                    this.get_address(token!.address_mode)
+                    if (token?.address_mode == address_modes.acc) {
+                        result = address
+                    } else{
+                    result = this.read_address(address)
+                    }
+                    this.registers.C = Number(this.is_bit_set(result, 0))
+                    this.registers.N = 0
+                    result = result >>> 1
+                    this.evaluate_zero(result)
+                    this.write_address(address, result, true)
                     break;
                 case "NOP":
                     break;
@@ -198,13 +216,42 @@ export class Cpu {
                     this.number_to_registers(this.pull_from_stack(1))
                     break;
                 case "ROL":
-                    this.get_address(token!.address_mode)
+                    if (token?.address_mode == address_modes.acc) {
+                        result = address
+                    } else{
+                        result = this.read_address(address)
+                    }
+                    result = (result << 1) + this.registers.C
+                    this.registers.C = Number(this.is_bit_set(result, 8))
+                    result = result & 0xFF
+                    // result = parseInt(
+                    //     result.toString(2).padStart(8, "0").substring(1)
+                    //     + result.toString(2).padStart(8, "0").substring(0, 1)
+                    // , 2)
+                    // this.registers.C = result & 0x80
+                    // result = (result << 1 | (this.registers.C ? 1 : 0)) & 0xFF;
+                    this.set_usual_flags(result)
+                    this.write_address(address, result, true)
                     break;
                 case "ROR":
-                    this.get_address(token!.address_mode)
+                    if (token?.address_mode == address_modes.acc) {
+                        result = address
+                    } else{
+                        result = this.read_address(address)
+                    }
+                    result = (this.registers.C << 8) + result
+                    this.registers.C = Number(this.is_bit_set(result, 0))
+                    result = result >>> 1
+                    // result = parseInt(
+                    //     result.toString(2).padStart(8, "0").substring(7)
+                    //     + result.toString(2).padStart(8, "0").substring(0, 7)
+                    //     , 2)
+                    this.set_usual_flags(result)
+                    this.write_address(address, result, true)
                     break;
                 case "RTI":
-                    this.get_address(token!.address_mode)
+                    this.number_to_registers(this.pull_from_stack(1))
+                    this.pc = this.pull_from_stack(2) - 1
                     break;
                 case "RTS":
                     this.pc = this.pull_from_stack(2)
@@ -291,7 +338,7 @@ export class Cpu {
             case address_modes.acc:
                 this.append_instruction_log(this.read_address(this.pc))
                 return this.a
-            //DONE?
+            //DONE
             case address_modes.abs:
                 this.append_instruction_log(this.read_address(this.pc),
                     this.read_address(this.pc + 1), this.read_address(this.pc + 2))
@@ -299,7 +346,7 @@ export class Cpu {
                 upper_nibble = this.read_address(this.pc)
                 lower_nibble = this.read_address(this.pc - 1)
                 return this.combine_nibbles(upper_nibble, lower_nibble)
-            //DONE?
+            //DONE
             case address_modes.abx:
                 this.append_instruction_log(this.read_address(this.pc),
                     this.read_address(this.pc + 1), this.read_address(this.pc + 2))
@@ -307,7 +354,7 @@ export class Cpu {
                 upper_nibble = this.read_address(this.pc)
                 lower_nibble = this.read_address(this.pc - 1)
                 return this.combine_nibbles(upper_nibble, lower_nibble) + this.x
-            //DONE?
+            //DONE
             case address_modes.aby:
                 this.append_instruction_log(this.read_address(this.pc),
                     this.read_address(this.pc + 1), this.read_address(this.pc + 2))
@@ -324,12 +371,17 @@ export class Cpu {
             case address_modes.imp:
                 this.append_instruction_log(this.read_address(this.pc))
                 return NaN
-            //WIP
+            //DONE?
             case address_modes.ind:
                 this.append_instruction_log(this.read_address(this.pc),
                     this.read_address(this.pc + 1), this.read_address(this.pc + 2))
                 this.pc += 2;
-                return NaN
+                lower_nibble = this.read_address(this.pc - 1)
+                upper_nibble = this.read_address(this.pc)
+                offset = this.combine_nibbles(upper_nibble, lower_nibble)
+                lower_nibble = this.read_address(offset)
+                upper_nibble = this.read_address(offset + 1)
+                return this.combine_nibbles(upper_nibble, lower_nibble)
                 // return this.read_address(this.combine_nibbles(
                 //     this.read_address(this.read_address(this.pc)),
                 //     this.read_address(this.read_address(this.pc - 1))
@@ -337,11 +389,12 @@ export class Cpu {
             //WIP
             case address_modes.izx:
                 this.append_instruction_log(this.read_address(this.pc),
-                    this.read_address(this.pc + 1), this.read_address(this.pc + 2))
+                    this.read_address(this.pc + 1))
                 this.pc += 1;
-                upper_nibble = this.read_address(this.pc)
-                lower_nibble = this.read_address(this.pc - 1)
-                return NaN
+                offset = (this.read_address(this.pc) + this.x) & 0xFF
+                lower_nibble = this.read_address(offset)
+                upper_nibble = this.read_address(offset + 1)
+                return this.combine_nibbles(upper_nibble, lower_nibble)
                 // return this.read_address(this.combine_nibbles(
                 //     this.read_address(upper_nibble),
                 //     this.read_address(lower_nibble)
@@ -349,9 +402,12 @@ export class Cpu {
             //WIP
             case address_modes.izy:
                 this.append_instruction_log(this.read_address(this.pc),
-                    this.read_address(this.pc + 1), this.read_address(this.pc + 2))
+                    this.read_address(this.pc + 1))
                 this.pc += 1;
-                return NaN
+                offset = this.read_address(this.pc)
+                lower_nibble = this.read_address(offset)
+                upper_nibble = this.read_address(offset + 1)
+                return this.combine_nibbles(upper_nibble, lower_nibble) + this.y
                 // return this.read_address(this.pc)
             //DONE
             case address_modes.rel:
@@ -360,17 +416,17 @@ export class Cpu {
                 offset = this.read_address(this.pc)
                 if (offset & 0x80) offset = offset - 0x100;
                 return this.pc + offset
-            //DONE?
+            //DONE
             case address_modes.zpo:
                 this.append_instruction_log(this.read_address(this.pc), this.read_address(this.pc + 1))
                 this.pc += 1;
                 return this.read_address(this.pc)
-            //DONE?
+            //DONE
             case address_modes.zpx:
                 this.append_instruction_log(this.read_address(this.pc), this.read_address(this.pc + 1))
                 this.pc += 1;
                 return this.read_address(this.pc) + this.x
-            //DONE?
+            //DONE
             case address_modes.zpy:
                 this.append_instruction_log(this.read_address(this.pc), this.read_address(this.pc + 1))
                 this.pc += 1;
@@ -381,8 +437,12 @@ export class Cpu {
         }
     }
 
-    write_address(address : number, value : number) {
-        this.ram[address % 0x800] = value
+    write_address(address : number, value : number, is_accumulator? : boolean) {
+        if (is_accumulator) {
+            this.a = value
+        } else{
+            this.ram[address % 0x800] = value
+        }
     }
 
     read_address(address : number) : number {
@@ -482,20 +542,20 @@ export class Cpu {
         if (value <= 0xFF) {
             this.ram[this.s + 0x100] = value
             this.s -= 1
-            if (this.comparing) {
-                console.log("Pushed " + value.toString(16) + " to stack at stack pointer " + this.s.toString(16))
-                console.log(this.ram.slice(0x100,0x200))
-            }
+            // if (this.comparing) {
+            //     console.log("Pushed " + value.toString(16) + " to stack at stack pointer " + this.s.toString(16))
+            //     console.log(this.ram.slice(0x100,0x200))
+            // }
         } else {
             this.ram[this.s + 0x100] = (value - (value & 0xFF))/0x100
             this.ram[(this.s - 1) + 0x100] = value & 0xFF
             this.s -= 2
             if (this.comparing) {
-                console.log("Pushed " + this.combine_nibbles(
-                    this.ram[this.s + 0x100] = (value - (value & 0xFF))/0x100,
-                    this.ram[(this.s - 1) + 0x100] = value & 0xFF
-                ).toString(16) + " to stack at stack pointer " + this.s.toString(16))
-                console.log(this.ram.slice(0x100,0x200))
+                // console.log("Pushed " + this.combine_nibbles(
+                //     this.ram[this.s + 0x100] = (value - (value & 0xFF))/0x100,
+                //     this.ram[(this.s - 1) + 0x100] = value & 0xFF
+                // ).toString(16) + " to stack at stack pointer " + this.s.toString(16))
+                // console.log(this.ram.slice(0x100,0x200))
             }
         }
     }
@@ -504,21 +564,18 @@ export class Cpu {
         if (byte_count == 1) {
             this.s += 1
             const value = this.ram[this.s + 0x100]
-            // this.ram[this.s + 0x100] = 0
             if (this.comparing) {
-                console.log("Pulled " + value.toString(16) + " from stack at stack pointer " + this.s.toString(16))
-                console.log(this.ram.slice(0x100,0x200))
+                // console.log("Pulled " + value.toString(16) + " from stack at stack pointer " + this.s.toString(16))
+                // console.log(this.ram.slice(0x100,0x200))
             }
             return value!
         } else {
             this.s += 2
             const msb = this.ram[(this.s) + 0x100]
             const lsb = this.ram[(this.s - 1) + 0x100]
-            // this.ram[this.s + 0x100] = 0
-            // this.ram[(this.s - 1) + 0x100] = 0
             if(this.comparing){
-                console.log("Pulled " + this.combine_nibbles(msb, lsb).toString(16) + " from stack at stack pointer " + this.s.toString(16))
-                console.log(this.ram.slice(0x100,0x200))
+                // console.log("Pulled " + this.combine_nibbles(msb, lsb).toString(16) + " from stack at stack pointer " + this.s.toString(16))
+                // console.log(this.ram.slice(0x100,0x200))
             }
             return this.combine_nibbles(msb, lsb)
         }
