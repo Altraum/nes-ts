@@ -15,7 +15,6 @@ export class Cpu {
     cycles: number = 7;
     log: Array<string> = [];
     logline: string = "";
-    stack : Array<number> = [];
     ram: Array<number> = new Array<number>(0x800).fill(0);
     comparing : boolean = true;
 
@@ -192,11 +191,11 @@ export class Cpu {
                     }
                     break;
                 case "PLA":
-                    this.a = this.pull_from_stack()
+                    this.a = this.pull_from_stack(1)
                     this.set_usual_flags(this.a)
                     break;
                 case "PLP":
-                    this.number_to_registers(this.pull_from_stack())
+                    this.number_to_registers(this.pull_from_stack(1))
                     break;
                 case "ROL":
                     this.get_address(token!.address_mode)
@@ -208,7 +207,7 @@ export class Cpu {
                     this.get_address(token!.address_mode)
                     break;
                 case "RTS":
-                    this.pc = this.pull_from_stack()
+                    this.pc = this.pull_from_stack(2)
                     break;
                 case "SBC":
                     result = this.a + ~this.read_address(address) + this.registers.C
@@ -387,8 +386,6 @@ export class Cpu {
     }
 
     read_address(address : number) : number {
-        // if (address < 0x0100) return this.ram[address % 0x800];
-        // if (address < 0x0200) return this.stack[0x200 - address]
         if (address < 0x2000) return this.ram[address % 0x800];
         if (address < 0x4000) {
             console.log("Attempt at PPU Register Read")
@@ -482,14 +479,55 @@ export class Cpu {
     }
 
     push_to_stack(value:number) {
-        this.stack.push(value)
-        this.s -= value < 256 ? 1 : 2
+        if (value <= 0xFF) {
+            this.ram[this.s + 0x100] = value
+            this.s -= 1
+            if (this.comparing) {
+                console.log("Pushed " + value.toString(16) + " to stack at stack pointer " + this.s.toString(16))
+                console.log(this.ram.slice(0x100,0x200))
+            }
+        } else {
+            this.ram[this.s + 0x100] = (value - (value & 0xFF))/0x100
+            this.ram[(this.s - 1) + 0x100] = value & 0xFF
+            this.s -= 2
+            if (this.comparing) {
+                console.log("Pushed " + this.combine_nibbles(
+                    this.ram[this.s + 0x100] = (value - (value & 0xFF))/0x100,
+                    this.ram[(this.s - 1) + 0x100] = value & 0xFF
+                ).toString(16) + " to stack at stack pointer " + this.s.toString(16))
+                console.log(this.ram.slice(0x100,0x200))
+            }
+        }
     }
 
-    pull_from_stack() : number {
-        const value = this.stack.pop()
-        this.s += value! < 256 ? 1 : 2
-        return value!
+    pull_from_stack(byte_count : number) : number {
+        if (byte_count == 1) {
+            this.s += 1
+            const value = this.ram[this.s + 0x100]
+            // this.ram[this.s + 0x100] = 0
+            if (this.comparing) {
+                console.log("Pulled " + value.toString(16) + " from stack at stack pointer " + this.s.toString(16))
+                console.log(this.ram.slice(0x100,0x200))
+            }
+            return value!
+        } else {
+            this.s += 2
+            const msb = this.ram[(this.s) + 0x100]
+            const lsb = this.ram[(this.s - 1) + 0x100]
+            // this.ram[this.s + 0x100] = 0
+            // this.ram[(this.s - 1) + 0x100] = 0
+            if(this.comparing){
+                console.log("Pulled " + this.combine_nibbles(msb, lsb).toString(16) + " from stack at stack pointer " + this.s.toString(16))
+                console.log(this.ram.slice(0x100,0x200))
+            }
+            return this.combine_nibbles(msb, lsb)
+        }
+        // const value = this.ram[this.s + 0x100]
+        // this.ram[this.s + 0x100] = 0
+        // this.s += value! < 256 ? 1 : 2
+        // console.log("Pulled stack")
+        // console.log(this.ram.slice(0x100,0x200))
+        // return value!
     }
 
     evaluate_negative(value : number) {
