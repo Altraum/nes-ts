@@ -231,7 +231,7 @@ export class Cpu {
                     // this.registers.C = result & 0x80
                     // result = (result << 1 | (this.registers.C ? 1 : 0)) & 0xFF;
                     this.set_usual_flags(result)
-                    this.write_address(address, result, true)
+                    this.write_address(address, result,  token?.address_mode == address_modes.acc)
                     break;
                 case "ROR":
                     if (token?.address_mode == address_modes.acc) {
@@ -247,7 +247,7 @@ export class Cpu {
                     //     + result.toString(2).padStart(8, "0").substring(0, 7)
                     //     , 2)
                     this.set_usual_flags(result)
-                    this.write_address(address, result, true)
+                    this.write_address(address, result,  token?.address_mode == address_modes.acc)
                     break;
                 case "RTI":
                     this.number_to_registers(this.pull_from_stack(1))
