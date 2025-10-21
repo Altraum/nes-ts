@@ -386,20 +386,24 @@ export class Cpu {
                 //     this.read_address(this.read_address(this.pc)),
                 //     this.read_address(this.read_address(this.pc - 1))
                 // ))
-            //WIP
+            //DONE?
             case address_modes.izx:
                 this.append_instruction_log(this.read_address(this.pc),
                     this.read_address(this.pc + 1))
                 this.pc += 1;
                 offset = (this.read_address(this.pc) + this.x) & 0xFF
                 lower_nibble = this.read_address(offset)
-                upper_nibble = this.read_address(offset + 1)
+                upper_nibble = this.read_address((offset + 1) & 0xFF)
+                // if(this.comparing){
+                //     console.log("izx address " + this.combine_nibbles(upper_nibble, lower_nibble).toString(16)
+                //         + " found value " + this.read_address(this.combine_nibbles(upper_nibble,lower_nibble)).toString(16))
+                // }
                 return this.combine_nibbles(upper_nibble, lower_nibble)
                 // return this.read_address(this.combine_nibbles(
                 //     this.read_address(upper_nibble),
                 //     this.read_address(lower_nibble)
                 // ))
-            //WIP
+            //DONE?
             case address_modes.izy:
                 this.append_instruction_log(this.read_address(this.pc),
                     this.read_address(this.pc + 1))
@@ -420,17 +424,17 @@ export class Cpu {
             case address_modes.zpo:
                 this.append_instruction_log(this.read_address(this.pc), this.read_address(this.pc + 1))
                 this.pc += 1;
-                return this.read_address(this.pc)
+                return this.read_address(this.pc) & 0xFF
             //DONE
             case address_modes.zpx:
                 this.append_instruction_log(this.read_address(this.pc), this.read_address(this.pc + 1))
                 this.pc += 1;
-                return this.read_address(this.pc) + this.x
+                return (this.read_address(this.pc) + this.x) & 0xFF
             //DONE
             case address_modes.zpy:
                 this.append_instruction_log(this.read_address(this.pc), this.read_address(this.pc + 1))
                 this.pc += 1;
-                return this.read_address(this.pc) + this.y
+                return (this.read_address(this.pc) + this.y) & 0xFF
             default:
                 console.log("Unrecognized address mode: " + mode)
                 return NaN
@@ -619,6 +623,7 @@ export class Cpu {
             console.log("Caused a diff at line " + this.i)
             console.log("GOLD| " + gold_log)
             console.log("MINE| " + my_log)
+            console.log(this.ram)
             this.comparing = false
         }
     }
