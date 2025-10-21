@@ -72,7 +72,7 @@ export class Cpu {
                     result = (result << 1) & 0xFF
                     this.registers.N = Number(this.is_bit_set(result, 7))
                     this.evaluate_zero(result)
-                    this.write_address(address, result, true)
+                    this.write_address(address, result,  token?.address_mode == address_modes.acc)
                     break;
                 case "BCC":
                     this.branch(!this.registers.C, address)
@@ -189,7 +189,7 @@ export class Cpu {
                     this.registers.N = 0
                     result = result >>> 1
                     this.evaluate_zero(result)
-                    this.write_address(address, result, true)
+                    this.write_address(address, result, token?.address_mode == address_modes.acc)
                     break;
                 case "NOP":
                     break;
@@ -424,7 +424,11 @@ export class Cpu {
             case address_modes.zpo:
                 this.append_instruction_log(this.read_address(this.pc), this.read_address(this.pc + 1))
                 this.pc += 1;
-                return this.read_address(this.pc) & 0xFF
+                if(this.comparing){
+                    console.log("Zero page address " + this.read_address(this.pc).toString(16)
+                        + " found value " + this.read_address(this.read_address(this.pc)).toString(16))
+                }
+                return this.read_address(this.pc)
             //DONE
             case address_modes.zpx:
                 this.append_instruction_log(this.read_address(this.pc), this.read_address(this.pc + 1))
