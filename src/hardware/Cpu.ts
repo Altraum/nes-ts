@@ -33,7 +33,7 @@ export class Cpu {
         let parsing : boolean = true;
         this.pc = this.get_init()
         while (parsing) {
-            this.logline += this.pc.toString(16)
+            this.logline += this.pc.toString(16).padStart(4, "0")
             const register_status = "A:" + this.a.toString(16).padStart(2,"0")
                 + " X:" + this.x.toString(16).padStart(2,"0")
                 + " Y:" + this.y.toString(16).padStart(2,"0")
@@ -353,7 +353,7 @@ export class Cpu {
                 this.pc += 2;
                 upper_nibble = this.read_address(this.pc)
                 lower_nibble = this.read_address(this.pc - 1)
-                return this.combine_nibbles(upper_nibble, lower_nibble) + this.x
+                return (this.combine_nibbles(upper_nibble, lower_nibble) + this.x) & 0xFFFF
             //DONE
             case address_modes.aby:
                 this.append_instruction_log(this.read_address(this.pc),
@@ -361,7 +361,7 @@ export class Cpu {
                 this.pc += 2;
                 upper_nibble = this.read_address(this.pc)
                 lower_nibble = this.read_address(this.pc - 1)
-                return this.combine_nibbles(upper_nibble, lower_nibble) + this.y
+                return (this.combine_nibbles(upper_nibble, lower_nibble) + this.y) & 0xFFFF
             //DONE
             case address_modes.imm:
                 this.append_instruction_log(this.read_address(this.pc), this.read_address(this.pc + 1))
@@ -378,9 +378,17 @@ export class Cpu {
                 this.pc += 2;
                 lower_nibble = this.read_address(this.pc - 1)
                 upper_nibble = this.read_address(this.pc)
+                if(this.comparing){
+                    console.log("ind address " + this.combine_nibbles(upper_nibble, lower_nibble).toString(16)
+                        + " found value " + this.read_address(this.combine_nibbles(upper_nibble,lower_nibble)).toString(16))
+                }
                 offset = this.combine_nibbles(upper_nibble, lower_nibble)
+                if (lower_nibble == 0xFF) {
+                    upper_nibble = this.read_address(offset - 0xFF)
+                } else{
+                    upper_nibble = this.read_address(offset + 1)
+                }
                 lower_nibble = this.read_address(offset)
-                upper_nibble = this.read_address(offset + 1)
                 return this.combine_nibbles(upper_nibble, lower_nibble)
                 // return this.read_address(this.combine_nibbles(
                 //     this.read_address(this.read_address(this.pc)),
@@ -410,8 +418,12 @@ export class Cpu {
                 this.pc += 1;
                 offset = this.read_address(this.pc)
                 lower_nibble = this.read_address(offset)
-                upper_nibble = this.read_address(offset + 1)
-                return this.combine_nibbles(upper_nibble, lower_nibble) + this.y
+                upper_nibble = this.read_address((offset + 1) & 0xFF)
+                if(this.comparing){
+                    console.log("izy address " + (this.combine_nibbles(upper_nibble, lower_nibble) + this.y).toString(16)
+                        + " found value " + (this.read_address(this.combine_nibbles(upper_nibble, lower_nibble) + this.y) & 0xFFFF).toString(16))
+                }
+                return (this.combine_nibbles(upper_nibble, lower_nibble) + this.y) & 0xFFFF
                 // return this.read_address(this.pc)
             //DONE
             case address_modes.rel:
