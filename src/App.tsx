@@ -3,15 +3,18 @@
 //import viteLogo from '/vite.svg'
 import './App.css'
 import FileLoader from "./components/FileLoader.tsx";
+import ThreeDemo from "./components/3ddemo.tsx";
 
 function App() {
     // const [count, setCount] = useState(0)
 
   return (
     <>
-      <FileLoader/>
+        {/*<FileLoader/>*/}
+        <ThreeDemo/>
     </>
   )
 }
+
 
 export default App
