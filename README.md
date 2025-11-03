@@ -22,8 +22,8 @@ A React/Typescript based emulator for the Nintendo Entertainment System.
           - [ ] Mapper 2
           - [ ] Mapper 3
 - [ ] PPU
-      - [ ] Nametables
-      - [ ] Attribute Tables
-      - [ ] Pallete Tables
-      - [ ] Pattern Tables
+     - [ ] Nametables
+     - [ ] Attribute Tables
+     - [ ] Pallete Tables
+     - [ ] Pattern Tables
 - [ ] APU
