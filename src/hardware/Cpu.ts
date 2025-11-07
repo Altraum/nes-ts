@@ -390,10 +390,6 @@ export class Cpu {
                 }
                 lower_nibble = this.read_address(offset)
                 return this.combine_nibbles(upper_nibble, lower_nibble)
-                // return this.read_address(this.combine_nibbles(
-                //     this.read_address(this.read_address(this.pc)),
-                //     this.read_address(this.read_address(this.pc - 1))
-                // ))
             //DONE?
             case address_modes.izx:
                 this.append_instruction_log(this.read_address(this.pc),
@@ -407,10 +403,6 @@ export class Cpu {
                 //         + " found value " + this.read_address(this.combine_nibbles(upper_nibble,lower_nibble)).toString(16))
                 // }
                 return this.combine_nibbles(upper_nibble, lower_nibble)
-                // return this.read_address(this.combine_nibbles(
-                //     this.read_address(upper_nibble),
-                //     this.read_address(lower_nibble)
-                // ))
             //DONE?
             case address_modes.izy:
                 this.append_instruction_log(this.read_address(this.pc),
@@ -419,12 +411,11 @@ export class Cpu {
                 offset = this.read_address(this.pc)
                 lower_nibble = this.read_address(offset)
                 upper_nibble = this.read_address((offset + 1) & 0xFF)
-                if(this.comparing){
-                    console.log("izy address " + (this.combine_nibbles(upper_nibble, lower_nibble) + this.y).toString(16)
-                        + " found value " + (this.read_address(this.combine_nibbles(upper_nibble, lower_nibble) + this.y) & 0xFFFF).toString(16))
-                }
+                // if(this.comparing){
+                //     console.log("izy address " + (this.combine_nibbles(upper_nibble, lower_nibble) + this.y).toString(16)
+                //         + " found value " + (this.read_address(this.combine_nibbles(upper_nibble, lower_nibble) + this.y) & 0xFFFF).toString(16))
+                // }
                 return (this.combine_nibbles(upper_nibble, lower_nibble) + this.y) & 0xFFFF
-                // return this.read_address(this.pc)
             //DONE
             case address_modes.rel:
                 this.append_instruction_log(this.read_address(this.pc), this.read_address(this.pc + 1))
