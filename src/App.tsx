@@ -2,14 +2,18 @@
 //import reactLogo from './assets/react.svg'
 //import viteLogo from '/vite.svg'
 import './App.css'
-import FileLoader from "./components/FileLoader.tsx";
+import Sidebar from "./components/Sidebar.tsx";
+import Title from "./components/Title.tsx";
+import About from "./components/About.tsx";
 
 function App() {
     // const [count, setCount] = useState(0)
 
   return (
     <>
-      <FileLoader/>
+        <Title/>
+        <About/>
+        <Sidebar/>
     </>
   )
 }
