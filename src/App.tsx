@@ -4,17 +4,18 @@
 import './App.css'
 import Sidebar from "./components/Sidebar.tsx";
 import Title from "./components/Title.tsx";
-import CpuReader from "./components/CpuReader.tsx";
+import {BrowserRouter} from "react-router-dom";
+import Main from "./components/Main.tsx";
 
 function App() {
     // const [count, setCount] = useState(0)
 
   return (
-    <>
+    <BrowserRouter>
         <Title/>
-        <CpuReader/>
+        <Main/>
         <Sidebar/>
-    </>
+    </BrowserRouter>
   )
 }
 
