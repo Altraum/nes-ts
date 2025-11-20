@@ -16,4 +16,8 @@ export class Nes {
     runCpu(){
         cpu = new Cpu(rom);
     }
+
+    getCpuLog() {
+        return cpu.get_log();
+    }
 }
