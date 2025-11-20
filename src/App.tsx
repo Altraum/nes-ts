@@ -4,7 +4,7 @@
 import './App.css'
 import Sidebar from "./components/Sidebar.tsx";
 import Title from "./components/Title.tsx";
-import About from "./components/About.tsx";
+import CpuReader from "./components/CpuReader.tsx";
 
 function App() {
     // const [count, setCount] = useState(0)
@@ -12,7 +12,7 @@ function App() {
   return (
     <>
         <Title/>
-        <About/>
+        <CpuReader/>
         <Sidebar/>
     </>
   )
