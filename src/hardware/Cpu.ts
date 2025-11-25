@@ -18,6 +18,7 @@ export class Cpu {
     ram: Array<number> = new Array<number>(0x800).fill(0);
     comparing : boolean = true;
     parsing : boolean = true;
+    current_opcode : Opcode | undefined = undefined;
 
     registers = {
         C: 0,
@@ -53,6 +54,7 @@ export class Cpu {
             + " PPU:" + "0".padStart(3, " ") + "," + "0".padStart(3," ")
             + " CYC:" + this.cycles
         const token = Opcodes.get(this.read_address(this.pc))
+        this.current_opcode = token;
         const address = this.get_address(token!.address_mode)
         let result : number
         // @ts-expect-error Undefined case will be handled by Default
@@ -362,7 +364,9 @@ export class Cpu {
                 this.pc += 2;
                 upper_nibble = this.read_address(this.pc)
                 lower_nibble = this.read_address(this.pc - 1)
-                return (this.combine_nibbles(upper_nibble, lower_nibble) + this.x) & 0xFFFF
+                offset = this.combine_nibbles(upper_nibble, lower_nibble) + this.x
+                this.check_page_crossing(offset - this.x, offset);
+                return offset & 0xFFFF;
             //DONE
             case address_modes.aby:
                 this.append_instruction_log(this.read_address(this.pc),
@@ -370,7 +374,9 @@ export class Cpu {
                 this.pc += 2;
                 upper_nibble = this.read_address(this.pc)
                 lower_nibble = this.read_address(this.pc - 1)
-                return (this.combine_nibbles(upper_nibble, lower_nibble) + this.y) & 0xFFFF
+                offset = this.combine_nibbles(upper_nibble, lower_nibble) + this.y
+                this.check_page_crossing(offset - this.y, offset);
+                return offset & 0xFFFF
             //DONE
             case address_modes.imm:
                 this.append_instruction_log(this.read_address(this.pc), this.read_address(this.pc + 1))
@@ -424,13 +430,16 @@ export class Cpu {
                 //     console.log("izy address " + (this.combine_nibbles(upper_nibble, lower_nibble) + this.y).toString(16)
                 //         + " found value " + (this.read_address(this.combine_nibbles(upper_nibble, lower_nibble) + this.y) & 0xFFFF).toString(16))
                 // }
-                return (this.combine_nibbles(upper_nibble, lower_nibble) + this.y) & 0xFFFF
+                offset = this.combine_nibbles(upper_nibble, lower_nibble) + this.y
+                this.check_page_crossing(offset - this.y, offset);
+                return offset & 0xFFFF
             //DONE
             case address_modes.rel:
                 this.append_instruction_log(this.read_address(this.pc), this.read_address(this.pc + 1))
                 this.pc += 1;
                 offset = this.read_address(this.pc)
                 if (offset & 0x80) offset = offset - 0x100;
+                this.check_page_crossing(this.pc, this.pc + offset)
                 return this.pc + offset
             //DONE
             case address_modes.zpo:
@@ -555,6 +564,7 @@ export class Cpu {
 
     branch(register:number|boolean, address : number) {
         if (register) {
+            this.cycles += 1
             this.pc = address
         }
     }
@@ -642,6 +652,12 @@ export class Cpu {
             console.log("MINE| " + my_log)
             console.log(this.ram)
             this.comparing = false
+        }
+    }
+
+    check_page_crossing(old_address : number, new_address : number){
+        if(this.current_opcode?.crosses_page && (old_address & 0xFF00) != (new_address & 0xFF00)){
+            this.cycles += 1;
         }
     }
 }
