@@ -439,7 +439,6 @@ export class Cpu {
                 this.pc += 1;
                 offset = this.read_address(this.pc)
                 if (offset & 0x80) offset = offset - 0x100;
-                this.check_page_crossing(this.pc, this.pc + offset)
                 return this.pc + offset
             //DONE
             case address_modes.zpo:
@@ -565,6 +564,7 @@ export class Cpu {
     branch(register:number|boolean, address : number) {
         if (register) {
             this.cycles += 1
+            this.check_page_crossing(this.pc + 1, address)
             this.pc = address
         }
     }
@@ -641,12 +641,18 @@ export class Cpu {
     }
 
     compare_logs() {
-        const my_log : string = this.logline.slice(0,20) + " " + this.logline.slice(20,46)
-        const gold_log : string = goldtest[this.comparison_index].slice(0,20) + " " + goldtest[this.comparison_index].slice(48,74)
+        const my_log : string = this.logline.slice(0,20) + " "
+            + this.logline.slice(20,46) + " "
+            + this.logline.slice(58)
+        const gold_log : string = goldtest[this.comparison_index].slice(0,20) + " "
+            + goldtest[this.comparison_index].slice(48,74) + " "
+            + goldtest[this.comparison_index].slice(86)
         if (!(my_log === gold_log)) {
             console.log("A bug at line " + (this.comparison_index-1))
-            console.log("GOLD| " + goldtest[this.comparison_index-1].slice(0,20) + " " + goldtest[this.comparison_index-1].slice(48,74))
-            // console.log("MINE| " + this.log[this.i-1].slice(0,20) + " " + this.log[this.i-1].slice(20,46))
+            console.log("GOLD| " + goldtest[this.comparison_index-1].slice(0,20) + " "
+                + goldtest[this.comparison_index-1].slice(48,74) + " "
+                + goldtest[this.comparison_index-1].slice(86)
+            )
             console.log("Caused a diff at line " + this.comparison_index)
             console.log("GOLD| " + gold_log)
             console.log("MINE| " + my_log)
@@ -656,6 +662,11 @@ export class Cpu {
     }
 
     check_page_crossing(old_address : number, new_address : number){
+        if(this.comparing) {
+            console.log("Page Cross Check at line " + this.comparison_index
+                + " | Old address " + old_address.toString(16) + " != " + new_address.toString(16)
+                + " is " + ((old_address & 0xFF00) != (new_address & 0xFF00)))
+        }
         if(this.current_opcode?.crosses_page && (old_address & 0xFF00) != (new_address & 0xFF00)){
             this.cycles += 1;
         }
