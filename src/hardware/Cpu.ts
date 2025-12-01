@@ -662,11 +662,11 @@ export class Cpu {
     }
 
     check_page_crossing(old_address : number, new_address : number){
-        if(this.comparing) {
-            console.log("Page Cross Check at line " + this.comparison_index
-                + " | Old address " + old_address.toString(16) + " != " + new_address.toString(16)
-                + " is " + ((old_address & 0xFF00) != (new_address & 0xFF00)))
-        }
+        // if(this.comparing) {
+        //     console.log("Page Cross Check at line " + this.comparison_index
+        //         + " | Old address " + old_address.toString(16) + " != " + new_address.toString(16)
+        //         + " is " + ((old_address & 0xFF00) != (new_address & 0xFF00)))
+        // }
         if(this.current_opcode?.crosses_page && (old_address & 0xFF00) != (new_address & 0xFF00)){
             this.cycles += 1;
         }
