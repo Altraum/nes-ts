@@ -9,6 +9,8 @@ export class Rom {
     has_extra_ram : number;
     has_trainer : number;
     prg_data : Uint8Array;
+    chr_data : Uint8Array;
+    kilobyte : number = 1024;
     constructor(rom_raw_array : ArrayBuffer){
         this.rom_data = new Uint8Array(rom_raw_array);
         this.rom_signature = (this.rom_data[0].toString(16) + this.rom_data[1].toString(16)
@@ -34,7 +36,21 @@ export class Rom {
             console.log("Flag 6: " + this.flag_6.toString(2));
             console.log("Flag 7: " + this.flag_7.toString(2));
             console.log("Mapper : " + this.mapper);
-            this.prg_data = this.rom_data.slice(16, 16 + 16384);
+            this.prg_data = this.rom_data.slice(16, 16 + this.get_prg_range());
+            this.chr_data = this.rom_data.slice(16 + this.get_prg_range(), 16  + this.get_prg_range() + this.get_chr_range());
+            // let chr_string : string = "";
+            // this.chr_data.forEach(chr => {
+            //     chr_string +=chr.toString(16) +  ","
+            // });
+            // console.log("Chr: " + chr_string);
         }
+    }
+
+    get_prg_range(){
+        return this.prg_units * (16 * this.kilobyte);
+    }
+
+    get_chr_range(){
+        return this.chr_units * (8 * this.kilobyte);
     }
 }

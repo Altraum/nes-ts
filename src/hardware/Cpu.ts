@@ -16,7 +16,7 @@ export class Cpu {
     log: Array<string> = [];
     logline: string = "";
     ram: Array<number> = new Array<number>(0x800).fill(0);
-    comparing : boolean = true;
+    comparing : boolean = false;
     parsing : boolean = true;
     current_opcode : Opcode | undefined = undefined;
 
